@@ -1,0 +1,30 @@
+name: Branch hygiene check
+
+# Read-only warning when main is ahead of develop. NEVER auto-mutates
+# branches. Recovery is a manual operator command.
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify branch relationship
+        run: |
+          set -euo pipefail
+          main_sha=$(git rev-parse main)
+          develop_sha=$(git rev-parse origin/develop 2>/dev/null || echo "missing")
+          main_count=$(git rev-list --count develop..main 2>/dev/null || echo 0)
+          develop_count=$(git rev-list --count main..develop 2>/dev/null || echo 0)
+          if [ "$main_count" -gt 0 ] && [ "$develop_count" -eq 0 ]; then
+            echo "::warning::main is ahead of develop. Run: git checkout develop && git merge --ff-only main && git push"
+          fi
